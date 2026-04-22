@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, 
@@ -18,7 +18,10 @@ import {
   AlertCircle,
   ArrowLeft,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Check,
+  Shield,
+  Box
 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -30,12 +33,29 @@ const CATEGORIES_CONFIG: Record<Category, { icon: any; color: string; bgColor: s
   'Data Structures': { icon: Layers, color: 'text-purple-700', bgColor: 'bg-purple-50', borderColor: 'border-purple-100' },
   'Python Internals': { icon: Terminal, color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-100' },
   'System Design': { icon: Database, color: 'text-emerald-700', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-100' },
+  'Pydantic': { icon: Shield, color: 'text-rose-700', bgColor: 'bg-rose-50', borderColor: 'border-rose-100' },
+  'Docker & K8s': { icon: Box, color: 'text-sky-700', bgColor: 'bg-sky-50', borderColor: 'border-sky-100' },
 };
 
 export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [completedTopics, setCompletedTopics] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('completedTopics') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleComplete = (id: string) => {
+    setCompletedTopics(prev => {
+      const next = prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id];
+      localStorage.setItem('completedTopics', JSON.stringify(next));
+      return next;
+    });
+  };
 
   const filteredTopics = useMemo(() => {
     return TOPICS.filter(topic => {
@@ -46,7 +66,7 @@ export default function App() {
     });
   }, [selectedCategory, searchQuery]);
 
-  const progress = Math.round((TOPICS.length / 20) * 100); // Mock progress
+  const progress = TOPICS.length > 0 ? Math.round((completedTopics.length / TOPICS.length) * 100) : 0;
 
   return (
     <div className="bg-slate-50 min-h-screen font-sans text-slate-800 flex flex-col p-4 md:p-6">
@@ -98,6 +118,8 @@ export default function App() {
             <TopicDetail 
               topic={selectedTopic} 
               onBack={() => setSelectedTopic(null)} 
+              isCompleted={completedTopics.includes(selectedTopic.id)}
+              onToggleComplete={() => toggleComplete(selectedTopic.id)}
             />
           ) : (
             <motion.div 
@@ -139,6 +161,7 @@ export default function App() {
                     key={topic.id} 
                     topic={topic} 
                     index={index}
+                    isCompleted={completedTopics.includes(topic.id)}
                     onClick={() => setSelectedTopic(topic)} 
                   />
                 ))}
@@ -157,7 +180,7 @@ export default function App() {
       <footer className="mt-8 flex flex-col md:flex-row justify-between items-center text-slate-400 text-[11px] font-medium tracking-tight gap-4 pt-6 border-t border-slate-200">
         <div className="flex gap-4">
           <span className="flex items-center gap-1.5 font-bold text-indigo-600 uppercase tracking-widest"><div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Session: Interview Ready</span>
-          <span className="uppercase tracking-widest">Role: Senior Backend Python</span>
+          <span className="uppercase tracking-widest">Role: Backend Engineer</span>
           <span className="uppercase tracking-widest">Target: Scalable Architectures</span>
         </div>
         <div className="flex items-center gap-4">
@@ -170,7 +193,7 @@ export default function App() {
   );
 }
 
-function TopicCard({ topic, index, onClick }: { topic: Topic; index: number; onClick: () => void }) {
+function TopicCard({ topic, index, onClick, isCompleted }: { topic: Topic; index: number; onClick: () => void; isCompleted: boolean }) {
   const config = CATEGORIES_CONFIG[topic.category];
   const Icon = config.icon;
 
@@ -181,7 +204,7 @@ function TopicCard({ topic, index, onClick }: { topic: Topic; index: number; onC
       transition={{ delay: index * 0.05 }}
       whileHover={{ y: -4 }}
       onClick={onClick}
-      className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col cursor-pointer hover:shadow-md transition-all group overflow-hidden"
+      className={`bg-white p-5 rounded-2xl shadow-sm border ${isCompleted ? 'border-emerald-200 ring-1 ring-emerald-500/10' : 'border-slate-200'} flex flex-col cursor-pointer hover:shadow-md transition-all group overflow-hidden relative`}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -192,7 +215,7 @@ function TopicCard({ topic, index, onClick }: { topic: Topic; index: number; onC
         <Icon className={`w-4 h-4 ${config.color} opacity-40 group-hover:opacity-100 transition-opacity`} />
       </div>
       
-      <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">
+      <h3 className={`text-lg font-bold mb-2 transition-colors ${isCompleted ? 'text-emerald-800' : 'text-slate-900 group-hover:text-indigo-600'}`}>
         {topic.title}
       </h3>
       
@@ -209,16 +232,31 @@ function TopicCard({ topic, index, onClick }: { topic: Topic; index: number; onC
       )}
 
       <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
-        <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Learn More</span>
-        <ChevronRight className="w-3 h-3 text-indigo-600" />
+        <span className={`text-[10px] font-bold uppercase tracking-widest ${isCompleted ? 'text-emerald-600' : 'text-indigo-600'}`}>
+          {isCompleted ? 'Completed' : 'Learn More'}
+        </span>
+        {isCompleted ? (
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+        ) : (
+          <ChevronRight className="w-3 h-3 text-indigo-600" />
+        )}
       </div>
     </motion.div>
   );
 }
 
-function TopicDetail({ topic, onBack }: { topic: Topic; onBack: () => void }) {
+function TopicDetail({ topic, onBack, isCompleted, onToggleComplete }: { topic: Topic; onBack: () => void; isCompleted: boolean; onToggleComplete: () => void }) {
   const config = CATEGORIES_CONFIG[topic.category];
   const Icon = config.icon;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (topic.code) {
+      navigator.clipboard.writeText(topic.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <motion.div 
@@ -228,17 +266,17 @@ function TopicDetail({ topic, onBack }: { topic: Topic; onBack: () => void }) {
       className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
     >
       {/* Detail Header */}
-      <div className="bg-slate-50 p-6 border-b border-slate-200">
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-widest mb-4 transition-colors group"
-        >
-          <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
-          Back to Knowledge Base
-        </button>
-        
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+      <div className="bg-slate-50 p-6 border-b border-slate-200 flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div>
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-widest mb-4 transition-colors group"
+          >
+            <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+            Back to Knowledge Base
+          </button>
+          
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
             <div className={`p-3 ${config.bgColor} rounded-xl border ${config.borderColor}`}>
               <Icon className={`w-6 h-6 ${config.color}`} />
             </div>
@@ -247,12 +285,25 @@ function TopicDetail({ topic, onBack }: { topic: Topic; onBack: () => void }) {
               <p className="text-slate-500 font-medium text-sm">{topic.description}</p>
             </div>
           </div>
-          <div className="flex flex-col items-end">
-             <span className={`px-2 py-1 ${config.bgColor} ${config.color} text-[10px] font-bold uppercase rounded border ${config.borderColor} mb-1`}>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 ${config.bgColor} ${config.color} text-[10px] font-bold uppercase rounded border ${config.borderColor}`}>
               {topic.category}
             </span>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Topic ID: {topic.id}</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {topic.id}</span>
           </div>
+          <button 
+            onClick={onToggleComplete}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
+              isCompleted 
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-indigo-600'
+            }`}
+          >
+            {isCompleted ? <><CheckCircle2 className="w-3.5 h-3.5" /> Completed</> : "Mark as read"}
+          </button>
         </div>
       </div>
 
@@ -263,7 +314,7 @@ function TopicDetail({ topic, onBack }: { topic: Topic; onBack: () => void }) {
             <CheckCircle2 className="w-5 h-5 text-indigo-500" />
             Core Concepts
           </h3>
-          <p className="text-slate-600 leading-relaxed text-base">
+          <p className="text-slate-600 leading-relaxed text-base whitespace-pre-wrap">
             {topic.content}
           </p>
         </div>
@@ -335,9 +386,12 @@ function TopicDetail({ topic, onBack }: { topic: Topic; onBack: () => void }) {
                   </div>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{topic.language || 'python'}</span>
                 </div>
-                <button className="text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-[10px] font-bold">
-                  <Copy className="w-3 h-3" />
-                  COPY
+                <button 
+                  onClick={handleCopy}
+                  className={`${copied ? 'text-emerald-400' : 'text-slate-400 hover:text-white'} transition-colors flex items-center gap-1 text-[10px] font-bold`}
+                >
+                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'COPIED!' : 'COPY'}
                 </button>
               </div>
               <SyntaxHighlighter 
@@ -360,20 +414,6 @@ function TopicDetail({ topic, onBack }: { topic: Topic; onBack: () => void }) {
             </p>
           </div>
         )}
-      </div>
-
-      <div className="bg-slate-50 px-8 py-4 border-t border-slate-200 flex justify-between items-center">
-        <button 
-          onClick={onBack}
-          className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1"
-        >
-          <ArrowLeft className="w-3 h-3" /> Back list
-        </button>
-        <div className="flex gap-4">
-           <button className="text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1">
-            <ExternalLink className="w-3 h-3" /> Official Docs
-          </button>
-        </div>
       </div>
     </motion.div>
   );

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type Category = 'Algorithms' | 'Data Structures' | 'System Design' | 'Python Internals';
+export type Category = 'Algorithms' | 'Data Structures' | 'System Design' | 'Python Internals' | 'Pydantic' | 'Docker & K8s';
 
 export interface Complexity {
   time: string;
